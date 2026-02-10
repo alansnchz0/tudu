@@ -702,10 +702,11 @@ class TuduApp(App):
         self._refresh_project_list()
         self._load_tasks()
 
-    def _refresh_project_list(self) -> None:
+    @work(exclusive=True)
+    async def _refresh_project_list(self) -> None:
         """Refresh the project sidebar."""
         project_list = self.query_one("#project-list", ListView)
-        project_list.clear()
+        await project_list.clear()
 
         if not self._projects:
             project_list.append(ListItem(Label("  No projects yet"), id="no-projects"))
@@ -725,12 +726,13 @@ class TuduApp(App):
         if self._projects:
             project_list.index = self.current_project_idx
 
-    def _load_tasks(self) -> None:
+    @work(exclusive=True)
+    async def _load_tasks(self) -> None:
         """Load tasks for the currently selected project."""
         scroll = self.query_one("#task-list-scroll", VerticalScroll)
-        # Remove old task rows
-        for child in list(scroll.children):
-            child.remove()
+        # Remove old task rows and wait for removal to complete before mounting new ones.
+        # This prevents DuplicateIds errors when the widget registry hasn't been updated yet.
+        await scroll.remove_children()
 
         if not self._projects:
             self._tasks = []
@@ -752,7 +754,7 @@ class TuduApp(App):
             return
 
         for i, task in enumerate(self._tasks):
-            row = TaskRow(task_data=task, id=f"task-{i}")
+            row = TaskRow(task_data=task, id=f"task-{task.id}")
             if i == self.current_task_idx:
                 row.selected = True
             scroll.mount(row)
