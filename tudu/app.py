@@ -103,6 +103,10 @@ Screen {
     dock: right;
 }
 
+#task-list-focus {
+    height: 1fr;
+}
+
 #task-list-scroll {
     height: 1fr;
 }
@@ -569,6 +573,16 @@ class ConfirmScreen(ModalScreen[bool]):
         self.dismiss(False)
 
 
+# ── Task List Focus Wrapper ──────────────────────────────────────────────
+
+class TaskListFocus(Container):
+    """Focusable container for the task list. When focused, arrow keys bubble
+    to the app for task navigation instead of being consumed by VerticalScroll
+    for scrolling."""
+
+    can_focus = True
+
+
 # ── Task Row Widget ─────────────────────────────────────────────────────
 
 class TaskRow(Widget):
@@ -644,8 +658,12 @@ class TuduApp(App):
         Binding("D", "delete_project", "Del Project", show=True, key_display="Shift+D"),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
+        Binding("down", "cursor_down", "Down", show=False),
+        Binding("up", "cursor_up", "Up", show=False),
         Binding("h", "focus_sidebar", "Sidebar", show=False),
         Binding("l", "focus_tasks", "Tasks", show=False),
+        Binding("left", "focus_sidebar", "Sidebar", show=False),
+        Binding("right", "focus_tasks", "Tasks", show=False),
         Binding("enter", "cycle_task", "Cycle Status", show=False),
         Binding("space", "cycle_task", "Cycle Status", show=False),
         Binding("tab", "switch_focus", "Switch Panel", show=False),
@@ -671,7 +689,8 @@ class TuduApp(App):
                 with Horizontal(id="task-header"):
                     yield Label("Tasks", id="task-title")
                     yield Label("", id="task-stats")
-                yield VerticalScroll(id="task-list-scroll")
+                with TaskListFocus(id="task-list-focus"):
+                    yield VerticalScroll(id="task-list-scroll")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -693,7 +712,7 @@ class TuduApp(App):
             project_list.append(ListItem(Label("  No projects yet"), id="no-projects"))
             return
 
-        for i, project in enumerate(self._projects):
+        for project in self._projects:
             stats = self.storage.get_project_stats(project.id)
             pct = stats["completion_pct"]
             label_text = f"{project.name}\n  {stats['done_tasks']}/{stats['total_tasks']} tasks  {pct:.0f}%"
@@ -774,11 +793,11 @@ class TuduApp(App):
     @on(ListView.Selected, "#project-list")
     def on_project_selected(self, event: ListView.Selected) -> None:
         if event.item and event.item.id and event.item.id.startswith("project-"):
-            project_id = event.item.id.removeprefix("project-")
-            for idx, project in enumerate(self._projects):
-                if project.id == project_id:
-                    if idx != self.current_project_idx:
-                        self.current_project_idx = idx
+            project_id = event.item.id[8:]  # len("project-") == 8
+            for i, p in enumerate(self._projects):
+                if p.id == project_id:
+                    if i != self.current_project_idx:
+                        self.current_project_idx = i
                         self.current_task_idx = 0
                         self._load_tasks()
                     break
@@ -824,8 +843,8 @@ class TuduApp(App):
     def action_focus_tasks(self) -> None:
         self.focus_on_tasks = True
         try:
-            scroll = self.query_one("#task-list-scroll", VerticalScroll)
-            scroll.focus()
+            task_list_focus = self.query_one("#task-list-focus", TaskListFocus)
+            task_list_focus.focus()
         except NoMatches:
             pass
 
