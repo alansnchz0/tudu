@@ -414,9 +414,9 @@ class EditTaskScreen(ModalScreen[Task | None]):
         Binding("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, task: Task) -> None:
+    def __init__(self, task_data: Task) -> None:
         super().__init__()
-        self.task = task
+        self.task_data = task_data
 
     def compose(self) -> ComposeResult:
         with Container(classes="modal-dialog"):
@@ -424,14 +424,14 @@ class EditTaskScreen(ModalScreen[Task | None]):
 
             yield Label("Title:", classes="modal-field-label")
             yield Input(
-                value=self.task.title,
+                value=self.task_data.title,
                 id="task-title-input",
                 classes="modal-field",
             )
 
             yield Label("Story Points:", classes="modal-field-label")
             yield Input(
-                value=str(self.task.story_points),
+                value=str(self.task_data.story_points),
                 id="task-sp-input",
                 classes="modal-field",
                 type="integer",
@@ -439,7 +439,7 @@ class EditTaskScreen(ModalScreen[Task | None]):
 
             yield Label("Description:", classes="modal-field-label")
             yield Input(
-                value=self.task.description,
+                value=self.task_data.description,
                 id="task-desc-input",
                 classes="modal-field",
             )
@@ -447,7 +447,7 @@ class EditTaskScreen(ModalScreen[Task | None]):
             yield Label("Status:", classes="modal-field-label")
             yield Select(
                 [(s.display, s.value) for s in TaskStatus],
-                value=self.task.status.value,
+                value=self.task_data.status.value,
                 id="task-status-select",
                 classes="modal-field",
             )
@@ -479,20 +479,20 @@ class EditTaskScreen(ModalScreen[Task | None]):
 
         sp_text = self.query_one("#task-sp-input", Input).value.strip()
         try:
-            story_points = int(sp_text) if sp_text else self.task.story_points
+            story_points = int(sp_text) if sp_text else self.task_data.story_points
         except ValueError:
-            story_points = self.task.story_points
+            story_points = self.task_data.story_points
 
         description = self.query_one("#task-desc-input", Input).value.strip()
         status_val = self.query_one("#task-status-select", Select).value
 
-        self.task.title = title
-        self.task.story_points = max(1, story_points)
-        self.task.description = description
+        self.task_data.title = title
+        self.task_data.story_points = max(1, story_points)
+        self.task_data.description = description
         if status_val and status_val != Select.BLANK:
-            self.task.status = TaskStatus(status_val)
+            self.task_data.status = TaskStatus(status_val)
 
-        self.dismiss(self.task)
+        self.dismiss(self.task_data)
 
 
 class HelpScreen(ModalScreen):
@@ -592,36 +592,36 @@ class TaskRow(Widget):
     selected = reactive(False)
 
     class Selected(Message):
-        def __init__(self, task: Task) -> None:
+        def __init__(self, task_data: Task) -> None:
             super().__init__()
-            self.task = task
+            self.task_data = task_data
 
-    def __init__(self, task: Task, **kwargs) -> None:
+    def __init__(self, task_data: Task, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.task = task
+        self.task_data = task_data
 
     def compose(self) -> ComposeResult:
-        icon = self.task.status.icon
-        sp = self.task.story_points
-        priority = self.task.priority
+        icon = self.task_data.status.icon
+        sp = self.task_data.story_points
+        priority = self.task_data.priority
 
         sp_class = f"sp-{priority.value}"
         priority_class = f"priority-{priority.value}"
 
         title_class = "task-title-text"
-        if self.task.is_complete:
+        if self.task_data.is_complete:
             title_class += " task-title-done"
 
         yield Static(icon, classes="task-status-icon")
         yield Static(f"[{sp}]", classes=f"task-sp-badge {sp_class}")
-        yield Static(self.task.title, classes=title_class)
+        yield Static(self.task_data.title, classes=title_class)
         yield Static(priority.display, classes=f"task-priority-label {priority_class}")
 
     def watch_selected(self, value: bool) -> None:
         self.set_class(value, "selected")
 
     def on_click(self) -> None:
-        self.post_message(self.Selected(self.task))
+        self.post_message(self.Selected(self.task_data))
 
 
 # ── Main Application ───────────────────────────────────────────────────
@@ -733,7 +733,7 @@ class TuduApp(App):
             return
 
         for i, task in enumerate(self._tasks):
-            row = TaskRow(task, id=f"task-{i}")
+            row = TaskRow(task_data=task, id=f"task-{i}")
             if i == self.current_task_idx:
                 row.selected = True
             scroll.mount(row)
@@ -782,7 +782,7 @@ class TuduApp(App):
     def on_task_row_selected(self, event: TaskRow.Selected) -> None:
         # Find the index of this task
         for i, task in enumerate(self._tasks):
-            if task.id == event.task.id:
+            if task.id == event.task_data.id:
                 self.current_task_idx = i
                 self._update_selection()
                 break
@@ -860,7 +860,7 @@ class TuduApp(App):
                 self._refresh_project_list()
                 self.notify(f"Task '{edited_task.title}' updated!")
 
-        self.push_screen(EditTaskScreen(task), on_result)
+        self.push_screen(EditTaskScreen(task_data=task), on_result)
 
     def action_toggle_task(self) -> None:
         if not self._tasks:
