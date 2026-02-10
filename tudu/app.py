@@ -692,11 +692,11 @@ class TuduApp(App):
             project_list.append(ListItem(Label("  No projects yet"), id="no-projects"))
             return
 
-        for i, project in enumerate(self._projects):
+        for project in self._projects:
             stats = self.storage.get_project_stats(project.id)
             pct = stats["completion_pct"]
             label_text = f"{project.name}\n  {stats['done_tasks']}/{stats['total_tasks']} tasks  {pct:.0f}%"
-            item = ListItem(Label(label_text), id=f"project-{i}")
+            item = ListItem(Label(label_text), id=f"project-{project.id}")
             project_list.append(item)
 
         # Ensure valid index
@@ -772,11 +772,14 @@ class TuduApp(App):
     @on(ListView.Selected, "#project-list")
     def on_project_selected(self, event: ListView.Selected) -> None:
         if event.item and event.item.id and event.item.id.startswith("project-"):
-            idx = int(event.item.id.split("-")[1])
-            if idx != self.current_project_idx:
-                self.current_project_idx = idx
-                self.current_task_idx = 0
-                self._load_tasks()
+            project_id = event.item.id[8:]  # len("project-") == 8
+            for i, p in enumerate(self._projects):
+                if p.id == project_id:
+                    if i != self.current_project_idx:
+                        self.current_project_idx = i
+                        self.current_task_idx = 0
+                        self._load_tasks()
+                    break
 
     @on(TaskRow.Selected)
     def on_task_row_selected(self, event: TaskRow.Selected) -> None:
