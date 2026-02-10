@@ -688,23 +688,26 @@ class TuduApp(App):
         project_list = self.query_one("#project-list", ListView)
         project_list.clear()
 
-        if not self._projects:
-            project_list.append(ListItem(Label("  No projects yet"), id="no-projects"))
-            return
+        def _populate_projects() -> None:
+            if not self._projects:
+                project_list.append(ListItem(Label("  No projects yet"), id="no-projects"))
+                return
 
-        for i, project in enumerate(self._projects):
-            stats = self.storage.get_project_stats(project.id)
-            pct = stats["completion_pct"]
-            label_text = f"{project.name}\n  {stats['done_tasks']}/{stats['total_tasks']} tasks  {pct:.0f}%"
-            item = ListItem(Label(label_text), id=f"project-{i}")
-            project_list.append(item)
+            for i, project in enumerate(self._projects):
+                stats = self.storage.get_project_stats(project.id)
+                pct = stats["completion_pct"]
+                label_text = f"{project.name}\n  {stats['done_tasks']}/{stats['total_tasks']} tasks  {pct:.0f}%"
+                item = ListItem(Label(label_text), id=f"project-{project.id}")
+                project_list.append(item)
 
-        # Ensure valid index
-        if self.current_project_idx >= len(self._projects):
-            self.current_project_idx = max(0, len(self._projects) - 1)
+            # Ensure valid index
+            if self.current_project_idx >= len(self._projects):
+                self.current_project_idx = max(0, len(self._projects) - 1)
 
-        if self._projects:
-            project_list.index = self.current_project_idx
+            if self._projects:
+                project_list.index = self.current_project_idx
+
+        self.call_after_refresh(_populate_projects)
 
     def _load_tasks(self) -> None:
         """Load tasks for the currently selected project."""
@@ -779,11 +782,14 @@ class TuduApp(App):
     @on(ListView.Selected, "#project-list")
     def on_project_selected(self, event: ListView.Selected) -> None:
         if event.item and event.item.id and event.item.id.startswith("project-"):
-            idx = int(event.item.id.split("-")[1])
-            if idx != self.current_project_idx:
-                self.current_project_idx = idx
-                self.current_task_idx = 0
-                self._load_tasks()
+            project_id = event.item.id.replace("project-", "", 1)
+            for idx, project in enumerate(self._projects):
+                if project.id == project_id:
+                    if idx != self.current_project_idx:
+                        self.current_project_idx = idx
+                        self.current_task_idx = 0
+                        self._load_tasks()
+                    break
 
     @on(TaskRow.Selected)
     def on_task_row_selected(self, event: TaskRow.Selected) -> None:
