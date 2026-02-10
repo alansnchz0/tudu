@@ -733,7 +733,7 @@ class TuduApp(App):
             return
 
         for i, task in enumerate(self._tasks):
-            row = TaskRow(task_data=task, id=f"task-{i}")
+            row = TaskRow(task_data=task, id=f"task-{task.id}")
             if i == self.current_task_idx:
                 row.selected = True
             scroll.mount(row)
