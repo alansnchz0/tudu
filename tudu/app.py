@@ -709,15 +709,17 @@ class TuduApp(App):
     def _load_tasks(self) -> None:
         """Load tasks for the currently selected project."""
         scroll = self.query_one("#task-list-scroll", VerticalScroll)
-        # Remove old task rows
+        # Remove old task rows - must complete before mounting new ones to avoid duplicate IDs
         for child in list(scroll.children):
             child.remove()
 
         if not self._projects:
             self._tasks = []
             self._update_task_header()
-            scroll.mount(
-                Static("No projects yet. Press Shift+P to create one.", id="empty-state")
+            self.call_after_refresh(
+                lambda: scroll.mount(
+                    Static("No projects yet. Press Shift+P to create one.", id="empty-state")
+                )
             )
             return
 
@@ -727,16 +729,21 @@ class TuduApp(App):
         self._update_task_header()
 
         if not self._tasks:
-            scroll.mount(
-                Static("No tasks yet. Press 'a' to add one.", id="empty-state")
+            self.call_after_refresh(
+                lambda: scroll.mount(
+                    Static("No tasks yet. Press 'a' to add one.", id="empty-state")
+                )
             )
             return
 
-        for i, task in enumerate(self._tasks):
-            row = TaskRow(task_data=task, id=f"task-{task.id}")
-            if i == self.current_task_idx:
-                row.selected = True
-            scroll.mount(row)
+        def _mount_task_rows() -> None:
+            for i, task in enumerate(self._tasks):
+                row = TaskRow(task_data=task)
+                if i == self.current_task_idx:
+                    row.selected = True
+                scroll.mount(row)
+
+        self.call_after_refresh(_mount_task_rows)
 
         # Ensure valid index
         if self.current_task_idx >= len(self._tasks):
